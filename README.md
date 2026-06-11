@@ -51,11 +51,6 @@ npm run dev
 
 Open the client at the Vite URL shown in the terminal, usually `http://localhost:5173`.
 
-## Notes
-
-- The backend still exposes the same API shape as the original app, so the new React frontend can reuse the same flows.
-- The backend will serve `client/dist` when you build the React app for production.
-- The old HTML frontend is still in the repo as a fallback/reference during the migration.
 
 ## Demo Data
 
@@ -65,9 +60,3 @@ Seed the sample placement test after PostgreSQL is ready:
 cd backend
 node seed-demo.js
 ```
-
-## Default Admin
-
-- Email: `tnpcell@gmail.com`
-- Password: `svittnp@1234`
-
