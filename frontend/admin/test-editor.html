@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Test Editor - Code7</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <style>
+    .question-list { display: flex; flex-direction: column; gap: 12px; }
+    .question-item { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+    .question-item .q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .tc-group { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+    .tc-group .tc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+    .tc-group textarea {
+      background: #161b22 !important;
+      border: 1px solid #30363d !important;
+      color: #e6edf3 !important;
+      font-family: 'Cascadia Code','Fira Code','Consolas',monospace !important;
+      font-size: 12px !important;
+      border-radius: 5px !important;
+      padding: 8px 10px !important;
+      line-height: 1.5 !important;
+    }
+    .tc-group textarea:focus { border-color: var(--primary) !important; }
+    .bp-group { background: var(--bg3); border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+    #bpCode {
+      background: #161b22 !important;
+      border: 1px solid #30363d !important;
+      color: #e6edf3 !important;
+      font-family: 'Cascadia Code','Fira Code','Consolas',monospace !important;
+      font-size: 13px !important;
+      border-radius: 6px !important;
+      padding: 12px 14px !important;
+      line-height: 1.6 !important;
+      min-height: 320px !important;
+      resize: vertical !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    #bpCode:focus { border-color: var(--primary) !important; outline: none !important; }
+    .marks-per-case-badge {
+      display: inline-block;
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #60a5fa;
+      font-size: 12px;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+    .add-tc-btn { font-size: 13px; color: var(--primary); cursor: pointer; background: none; border: none; padding: 4px 0; }
+    .add-tc-btn:hover { text-decoration: underline; }
+    .lang-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .lang-tab { padding: 4px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); }
+    .lang-tab.active { background: var(--primary); border-color: var(--primary); color: white; }
+    #qImagePreview img { max-width: 100%; max-height: 220px; border-radius: 6px; border: 1px solid var(--border); margin-top: 6px; }
+  </style>
+</head>
+<body>
+<div class="dashboard">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h2>Code7</h2>
+      <p>Test Editor</p>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="dashboard.html">← Back to Dashboard</a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h2 id="testTitleHeader">Loading...</h2>
+        <p class="text-muted" id="testMeta"></p>
+      </div>
+      <button class="btn btn-primary" onclick="openAddQuestion()">+ Add Question</button>
+    </div>
+    <div id="questionsContainer">
+      <div class="text-center text-muted" style="padding:40px"><span class="loader"></span></div>
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit Question Modal -->
+<div class="modal-overlay hidden" id="questionModal">
+  <div class="modal" style="max-width:800px">
+    <h3 id="qModalTitle">Add Question</h3>
+
+    <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end">
+      <div class="form-group" style="margin:0"><label>Question Title *</label><input type="text" id="qTitle" placeholder="e.g. Two Sum"/></div>
+      <div class="form-group" style="margin:0"><label>Marks *</label><input type="number" id="qMarks" value="10" min="1" style="width:80px"/></div>
+    </div>
+
+    <div class="form-group mt-3"><label>Problem Statement *</label><textarea id="qStatement" rows="5" placeholder="Describe the problem in detail..."></textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Input Format</label><textarea id="qInputFmt" rows="3" placeholder="Describe input format..."></textarea></div>
+      <div class="form-group"><label>Output Format</label><textarea id="qOutputFmt" rows="3" placeholder="Describe output format..."></textarea></div>
+    </div>
+    <div class="form-group"><label>Constraints</label><textarea id="qConstraints" rows="2" placeholder="e.g. 1 ≤ n ≤ 10^5"></textarea></div>
+
+    <!-- Question Image -->
+    <div class="form-group">
+      <label style="font-size:13px;color:var(--text2);font-weight:500">
+        Question Image
+        <span style="font-weight:400;font-size:12px"> — optional, for diagrams or visual context</span>
+      </label>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px">
+        <input type="file" id="qImageFile" accept="image/*" onchange="previewImage(this)" style="font-size:13px"/>
+        <button type="button" class="add-tc-btn" style="color:var(--danger)" onclick="clearImage()">Remove Image</button>
+      </div>
+      <div id="qImagePreview"></div>
+      <input type="hidden" id="qImageUrl"/>
+    </div>
+
+    <!-- Sample Test Cases -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <label style="font-size:13px;color:var(--text2);font-weight:500">Sample Test Cases</label>
+        <button class="add-tc-btn" onclick="addSampleCase()">+ Add Sample Case</button>
+      </div>
+      <div id="sampleCasesContainer"></div>
+    </div>
+
+    <!-- Hidden Test Cases -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="font-size:13px;color:var(--text2);font-weight:500">Hidden Test Cases (for evaluation)</label>
+          <span class="marks-per-case-badge" id="marksPerCaseLabel">? marks/case</span>
+        </div>
+        <button class="add-tc-btn" onclick="addHiddenCase()">+ Add Hidden Case</button>
+      </div>
+      <div id="hiddenCasesContainer"></div>
+    </div>
+
+    <!-- Boilerplate Code -->
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;color:var(--text2);font-weight:500;display:block;margin-bottom:8px">Boilerplate Code</label>
+      <div class="lang-tabs">
+        <div class="lang-tab active" onclick="switchBpLang('python', this)">Python</div>
+        <div class="lang-tab" onclick="switchBpLang('javascript', this)">JavaScript</div>
+        <div class="lang-tab" onclick="switchBpLang('java', this)">Java</div>
+        <div class="lang-tab" onclick="switchBpLang('cpp', this)">C++</div>
+        <div class="lang-tab" onclick="switchBpLang('c', this)">C</div>
+      </div>
+      <textarea id="bpCode" rows="16" placeholder="Boilerplate code for selected language..."></textarea>
+    </div>
+
+    <p id="qModalError" class="error-msg hidden"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeQModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveQuestion()" id="saveQBtn">Add Question</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  if (!requireAuth('admin')) {}
+
+  const params = new URLSearchParams(location.search);
+  const testId = params.get('id');
+  if (!testId) window.location.href = 'dashboard.html';
+
+  let testData = null;
+  let editingQId = null;
+  let sampleCaseCount = 0;
+  let hiddenCaseCount = 0;
+  let bpData = { python: '', javascript: '', java: '', cpp: '', c: '' };
+  let currentBpLang = 'python';
+
+  async function loadTest() {
+    try {
+      testData = await apiFetch(`/admin/tests/${testId}`);
+      document.getElementById('testTitleHeader').textContent = testData.title;
+      document.getElementById('testMeta').textContent = `${testData.duration} min · ${testData.total_marks} marks · ${testData.questions.length} questions`;
+      renderQuestions();
+    } catch(e) {
+      document.getElementById('questionsContainer').innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    }
+  }
+
+  function renderQuestions() {
+    const container = document.getElementById('questionsContainer');
+    if (!testData.questions.length) {
+      container.innerHTML = '<div class="card text-center text-muted" style="padding:40px">No questions yet. Add your first question!</div>';
+      return;
+    }
+    container.innerHTML = '<div class="question-list">' + testData.questions.map((q, i) => `
+      <div class="question-item">
+        <div class="q-header">
+          <div>
+            <strong>Q${i+1}. ${q.title}</strong>
+            <span class="badge badge-info" style="margin-left:8px">${q.marks} marks</span>
+            ${q.image_url ? '<span class="badge badge-info" style="margin-left:4px">Image</span>' : ''}
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="editQuestion('${q.id}')">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteQuestion('${q.id}')">Delete</button>
+          </div>
+        </div>
+        <p class="text-sm text-muted">${q.problem_statement.substring(0, 120)}${q.problem_statement.length > 120 ? '...' : ''}</p>
+        <div class="text-sm text-muted mt-2">
+          ${q.sample_cases.length} sample case(s) · ${q.hidden_cases.length} hidden case(s) · ${q.boilerplate.length} language(s)
+        </div>
+      </div>
+    `).join('') + '</div>';
+  }
+
+  function openAddQuestion() {
+    editingQId = null;
+    sampleCaseCount = 0;
+    hiddenCaseCount = 0;
+    bpData = { python: '', javascript: '', java: '', cpp: '', c: '' };
+    currentBpLang = 'python';
+
+    document.getElementById('qModalTitle').textContent = 'Add Question';
+    document.getElementById('saveQBtn').textContent = 'Add Question';
+    document.getElementById('qTitle').value = '';
+    document.getElementById('qMarks').value = 10;
+    document.getElementById('qStatement').value = '';
+    document.getElementById('qInputFmt').value = '';
+    document.getElementById('qOutputFmt').value = '';
+    document.getElementById('qConstraints').value = '';
+    document.getElementById('sampleCasesContainer').innerHTML = '';
+    document.getElementById('hiddenCasesContainer').innerHTML = '';
+    document.getElementById('bpCode').value = '';
+    document.getElementById('qModalError').classList.add('hidden');
+    document.querySelectorAll('.lang-tab').forEach((t,i) => t.classList.toggle('active', i===0));
+    clearImage();
+    addSampleCase();
+    addHiddenCase();
+    document.getElementById('questionModal').classList.remove('hidden');
+  }
+
+  function editQuestion(qId) {
+    const q = testData.questions.find(q => q.id === qId);
+    if (!q) return;
+    editingQId = qId;
+    sampleCaseCount = 0;
+    hiddenCaseCount = 0;
+    bpData = { python: '', javascript: '', java: '', cpp: '', c: '' };
+    currentBpLang = 'python';
+
+    document.getElementById('qModalTitle').textContent = 'Edit Question';
+    document.getElementById('saveQBtn').textContent = 'Save Changes';
+    document.getElementById('qTitle').value = q.title;
+    document.getElementById('qMarks').value = q.marks;
+    document.getElementById('qStatement').value = q.problem_statement;
+    document.getElementById('qInputFmt').value = q.input_format || '';
+    document.getElementById('qOutputFmt').value = q.output_format || '';
+    document.getElementById('qConstraints').value = q.constraints || '';
+    document.getElementById('sampleCasesContainer').innerHTML = '';
+    document.getElementById('hiddenCasesContainer').innerHTML = '';
+    document.getElementById('qModalError').classList.add('hidden');
+
+    // Image
+    clearImage();
+    if (q.image_url) {
+      document.getElementById('qImageUrl').value = q.image_url;
+      document.getElementById('qImagePreview').innerHTML = `<img src="${q.image_url}" alt="Question image"/>`;
+    }
+
+    for (const tc of q.sample_cases) addSampleCase(tc.input, tc.expected_output, tc.explanation);
+    if (!q.sample_cases.length) addSampleCase();
+    for (const tc of q.hidden_cases) addHiddenCase(tc.input, tc.expected_output);
+    if (!q.hidden_cases.length) addHiddenCase();
+
+    for (const bp of q.boilerplate) bpData[bp.language] = bp.code;
+    document.getElementById('bpCode').value = bpData[currentBpLang];
+    document.querySelectorAll('.lang-tab').forEach((t,i) => t.classList.toggle('active', i===0));
+    document.getElementById('questionModal').classList.remove('hidden');
+  }
+
+  // ── Image helpers ──
+  function previewImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      document.getElementById('qImageUrl').value = e.target.result;
+      document.getElementById('qImagePreview').innerHTML = `<img src="${e.target.result}" alt="Preview"/>`;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearImage() {
+    document.getElementById('qImageFile').value = '';
+    document.getElementById('qImageUrl').value = '';
+    document.getElementById('qImagePreview').innerHTML = '';
+  }
+
+  // ── Test cases ──
+  function addSampleCase(input='', output='', explanation='') {
+    const id = ++sampleCaseCount;
+    const div = document.createElement('div');
+    div.className = 'tc-group';
+    div.id = `sc-${id}`;
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span class="text-sm text-muted">Sample Case ${id}</span>
+        <button class="add-tc-btn" style="color:var(--danger)" onclick="this.closest('.tc-group').remove()">Remove</button>
+      </div>
+      <div class="tc-row">
+        <div><label style="font-size:12px;color:var(--text2)">Input</label><textarea rows="2" placeholder="Input...">${input}</textarea></div>
+        <div><label style="font-size:12px;color:var(--text2)">Expected Output</label><textarea rows="2" placeholder="Output...">${output}</textarea></div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text2)">Explanation (optional)</label><input type="text" placeholder="Brief explanation..." value="${explanation}"/></div>
+    `;
+    document.getElementById('sampleCasesContainer').appendChild(div);
+  }
+
+  function updateMarksPerCase() {
+    const marks = parseInt(document.getElementById('qMarks').value) || 0;
+    const count = document.querySelectorAll('#hiddenCasesContainer .tc-group').length;
+    const label = document.getElementById('marksPerCaseLabel');
+    if (!label) return;
+    if (count === 0 || marks === 0) {
+      label.textContent = '? marks/case';
+    } else {
+      const perCase = (marks / count).toFixed(2).replace(/\.?0+$/, '');
+      label.textContent = `${perCase} marks/case (${count} cases)`;
+    }
+  }
+
+  function addHiddenCase(input='', output='') {
+    const id = ++hiddenCaseCount;
+    const div = document.createElement('div');
+    div.className = 'tc-group';
+    div.id = `hc-${id}`;
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span class="text-sm text-muted">Hidden Case ${id}</span>
+        <button class="add-tc-btn" style="color:var(--danger)" onclick="this.closest('.tc-group').remove();updateMarksPerCase()">Remove</button>
+      </div>
+      <div class="tc-row">
+        <div><label style="font-size:12px;color:var(--text2)">Input</label><textarea rows="2" placeholder="Input...">${input}</textarea></div>
+        <div><label style="font-size:12px;color:var(--text2)">Expected Output</label><textarea rows="2" placeholder="Output...">${output}</textarea></div>
+      </div>
+    `;
+    document.getElementById('hiddenCasesContainer').appendChild(div);
+    updateMarksPerCase();
+  }
+
+  function switchBpLang(lang, el) {
+    bpData[currentBpLang] = document.getElementById('bpCode').value;
+    currentBpLang = lang;
+    document.getElementById('bpCode').value = bpData[lang];
+    document.querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function collectSampleCases() {
+    const cases = [];
+    document.querySelectorAll('#sampleCasesContainer .tc-group').forEach(el => {
+      const textareas = el.querySelectorAll('textarea');
+      const input_val  = textareas[0]?.value?.trim();
+      const output_val = textareas[1]?.value?.trim();
+      const explanation = el.querySelector('input')?.value?.trim() || '';
+      if (input_val !== undefined && output_val !== undefined && (input_val || output_val)) {
+        cases.push({ input: input_val, expected_output: output_val, explanation });
+      }
+    });
+    return cases;
+  }
+
+  function collectHiddenCases() {
+    const cases = [];
+    document.querySelectorAll('#hiddenCasesContainer .tc-group').forEach(el => {
+      const textareas = el.querySelectorAll('textarea');
+      const input_val  = textareas[0]?.value?.trim();
+      const output_val = textareas[1]?.value?.trim();
+      if (input_val !== undefined && output_val !== undefined && (input_val || output_val)) {
+        cases.push({ input: input_val, expected_output: output_val });
+      }
+    });
+    return cases;
+  }
+
+  function collectBoilerplate() {
+    bpData[currentBpLang] = document.getElementById('bpCode').value;
+    return Object.entries(bpData).filter(([,v]) => v.trim()).map(([language, code]) => ({ language, code }));
+  }
+
+  async function saveQuestion() {
+    const btn = document.getElementById('saveQBtn');
+    const err = document.getElementById('qModalError');
+    err.classList.add('hidden');
+
+    const body = {
+      title: document.getElementById('qTitle').value.trim(),
+      problem_statement: document.getElementById('qStatement').value.trim(),
+      input_format: document.getElementById('qInputFmt').value.trim(),
+      output_format: document.getElementById('qOutputFmt').value.trim(),
+      constraints: document.getElementById('qConstraints').value.trim(),
+      marks: parseInt(document.getElementById('qMarks').value),
+      order_index: editingQId ? undefined : testData.questions.length,
+      image_url: document.getElementById('qImageUrl').value || null,
+      sample_cases: collectSampleCases(),
+      hidden_cases: collectHiddenCases(),
+      boilerplate: collectBoilerplate()
+    };
+
+    if (!body.title || !body.problem_statement) {
+      showError(err, 'Title and problem statement are required');
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      if (editingQId) {
+        await apiFetch(`/admin/questions/${editingQId}`, { method: 'PUT', body });
+      } else {
+        await apiFetch(`/admin/tests/${testId}/questions`, { method: 'POST', body });
+      }
+      closeQModal();
+      await loadTest();
+    } catch(e) {
+      showError(err, e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function deleteQuestion(qId) {
+    if (!confirm('Delete this question?')) return;
+    await apiFetch(`/admin/questions/${qId}`, { method: 'DELETE' });
+    await loadTest();
+  }
+
+  function closeQModal() {
+    document.getElementById('questionModal').classList.add('hidden');
+  }
+
+  document.getElementById('qMarks').addEventListener('input', updateMarksPerCase);
+
+  loadTest();
+</script>
+</body>
+</html>

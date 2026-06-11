@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Test Instructions - Code7</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<div class="instructions-page">
+  <div class="instructions-card">
+    <div id="loadingState" class="text-center" style="padding:40px"><span class="loader"></span></div>
+
+    <div id="instructionsContent" class="hidden">
+      <h2 id="testTitle">Test Title</h2>
+      <div class="test-meta">
+        <span>⏱ <strong id="testDuration"></strong> minutes</span>
+        <span>🏆 <strong id="testMarks"></strong> marks</span>
+      </div>
+
+      <div id="countdownBox" class="countdown-box hidden">
+        <p>Test starts in</p>
+        <div class="count" id="countdownNum">5</div>
+        <p>Get ready!</p>
+      </div>
+
+      <ul class="instructions-list">
+        <li>The test will be conducted in fullscreen mode. Do not exit fullscreen.</li>
+        <li>Switching tabs or windows is monitored. Excessive switching will auto-submit your test.</li>
+        <li>The timer starts as soon as you click "Start Test" and cannot be paused.</li>
+        <li>You can navigate between questions freely during the test.</li>
+        <li>Click "Run" to test your code against sample cases before submitting.</li>
+        <li>Click "Submit Question" to save your answer for each question.</li>
+        <li>Click "Submit Test" to finalize your submission.</li>
+        <li>The test will auto-submit when time expires.</li>
+        <li id="customInstructions"></li>
+      </ul>
+
+      <div id="startSection">
+        <button class="btn btn-primary btn-lg w-full" id="startBtn" onclick="startCountdown()">
+          ▶ Start Test
+        </button>
+      </div>
+
+      <div style="text-align:center;margin-top:16px">
+        <a href="dashboard.html" class="text-sm text-muted">← Back to Dashboard</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  if (!requireAuth('student')) {}
+
+  const params = new URLSearchParams(location.search);
+  const testId = params.get('testId');
+  const existingAttemptId = params.get('attemptId');
+  let attemptId = existingAttemptId;
+  let testData = null;
+
+  async function init() {
+    if (!testId) { window.location.href = 'dashboard.html'; return; }
+    try {
+      // Start or resume attempt
+      const res = await apiFetch(`/student/tests/${testId}/start`, { method: 'POST' });
+      attemptId = res.attemptId;
+      testData = res.test;
+
+      document.getElementById('testTitle').textContent = testData.title;
+      document.getElementById('testDuration').textContent = testData.duration;
+      document.getElementById('testMarks').textContent = testData.total_marks;
+
+      const customInstr = document.getElementById('customInstructions');
+      if (testData.instructions) {
+        customInstr.textContent = testData.instructions;
+      } else {
+        customInstr.closest('li').remove();
+      }
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('instructionsContent').classList.remove('hidden');
+    } catch(e) {
+      document.getElementById('loadingState').innerHTML = `<div class="alert alert-danger">${e.message}</div><br/><a href="dashboard.html" class="btn btn-ghost">Back</a>`;
+    }
+  }
+
+  function startCountdown() {
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('startBtn').textContent = 'Starting...';
+    document.getElementById('countdownBox').classList.remove('hidden');
+    let count = 5;
+    document.getElementById('countdownNum').textContent = count;
+    const interval = setInterval(() => {
+      count--;
+      document.getElementById('countdownNum').textContent = count;
+      if (count <= 0) {
+        clearInterval(interval);
+        window.location.href = `test.html?attemptId=${attemptId}&duration=${testData.duration}`;
+      }
+    }, 1000);
+  }
+
+  init();
+</script>
+</body>
+</html>

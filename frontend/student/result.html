@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Test Result - Code7</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<div class="result-page">
+  <div class="result-card">
+    <div style="font-size:3rem" id="resultIcon">🎉</div>
+    <h2 style="margin-top:12px">Test Submitted!</h2>
+    <div class="result-score" id="scoreDisplay">--</div>
+    <p class="text-muted" id="autoMsg"></p>
+    <div class="result-details">
+      <div><div style="font-size:1.2rem;font-weight:600" id="scoreVal">-</div><div class="text-muted text-sm">Marks Obtained</div></div>
+    </div>
+    <div style="margin-top:24px;display:flex;flex-direction:column;gap:10px">
+      <a href="dashboard.html" class="btn btn-primary">← Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+<script src="../js/api.js"></script>
+<script>
+  if (!requireAuth('student')) {}
+  const params = new URLSearchParams(location.search);
+  const score = params.get('score') || 0;
+  const auto = params.get('auto') === 'true';
+
+  document.getElementById('scoreDisplay').textContent = score;
+  document.getElementById('scoreVal').textContent = score;
+
+  if (auto) {
+    document.getElementById('resultIcon').textContent = '⏰';
+    document.getElementById('autoMsg').textContent = 'Test was auto-submitted.';
+  }
+</script>
+</body>
+</html>

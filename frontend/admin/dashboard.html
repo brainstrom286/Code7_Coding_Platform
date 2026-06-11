@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Dashboard - Code7</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <style>
+    .danger-zone {
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: var(--radius);
+      padding: 20px;
+      background: rgba(239,68,68,0.04);
+    }
+    .danger-zone h4 { color: var(--danger); margin-bottom: 4px; font-size: 14px; }
+    .danger-zone p  { color: var(--text2); font-size: 13px; margin-bottom: 14px; }
+    .danger-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .confirm-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+      display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px;
+    }
+    .confirm-box {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px; max-width: 400px; width: 100%; text-align: center;
+    }
+    .confirm-box h3 { font-size: 1.1rem; margin-bottom: 8px; }
+    .confirm-box p { color: var(--text2); font-size: 13px; margin-bottom: 22px; line-height: 1.6; }
+    .confirm-box .actions { display: flex; gap: 10px; justify-content: center; }
+
+    .sort-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .sort-bar label { font-size: 13px; color: var(--text2); }
+    .sort-bar select { font-size: 13px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); }
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { color: var(--primary); }
+    th.sortable::after { content: ' \2195'; opacity: 0.4; font-size: 11px; }
+    th.sort-asc::after  { content: ' \2191'; opacity: 1; }
+    th.sort-desc::after { content: ' \2193'; opacity: 1; }
+  </style>
+</head>
+<body>
+<div class="dashboard">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h2>Code7</h2>
+      <p>Admin Panel</p>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" onclick="showSection('overview', this)">Overview</a>
+      <a class="nav-item" onclick="showSection('tests', this)">Manage Tests</a>
+      <a class="nav-item" onclick="showSection('students', this)">Students</a>
+      <a class="nav-item" onclick="showSection('results', this)">Results</a>
+      <a class="nav-item" onclick="showSection('settings', this)">Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn btn-ghost w-full" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+
+    <!-- Overview -->
+    <div id="section-overview">
+      <div class="page-header">
+        <div><h2>Dashboard Overview</h2><p>Platform statistics at a glance</p></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">Refresh</button>
+      </div>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-value" id="stat-students">-</div><div class="stat-label">Total Students</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-tests">-</div><div class="stat-label">Total Tests</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-attempts">-</div><div class="stat-label">Total Attempts</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Recent Activity</h3></div>
+        <div class="table-wrap" id="recentActivity">
+          <div class="text-center text-muted" style="padding:20px"><span class="loader"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tests -->
+    <div id="section-tests" class="hidden">
+      <div class="page-header">
+        <div><h2>Manage Tests</h2><p>Create and manage coding assessments</p></div>
+        <button class="btn btn-primary" onclick="openCreateTest()">+ Create Test</button>
+      </div>
+      <div id="testsContainer">
+        <div class="text-center text-muted" style="padding:40px"><span class="loader"></span></div>
+      </div>
+    </div>
+
+    <!-- Students -->
+    <div id="section-students" class="hidden">
+      <div class="page-header">
+        <div><h2>Students</h2><p>All registered students</p></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadStudents()">Refresh</button>
+      </div>
+      <div id="studentsContainer">
+        <div class="text-center text-muted" style="padding:40px"><span class="loader"></span></div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="section-results" class="hidden">
+      <div class="page-header"><div><h2>Test Results</h2><p>View student submissions</p></div></div>
+      <div class="card">
+        <div class="form-group" style="margin:0">
+          <label>Select Test</label>
+          <select id="resultTestSelect" onchange="loadResults()">
+            <option value="">-- Select a test --</option>
+          </select>
+        </div>
+      </div>
+      <div id="resultsContainer"></div>
+    </div>
+
+    <!-- Settings -->
+    <div id="section-settings" class="hidden">
+      <div class="page-header"><div><h2>Settings</h2><p>Platform management and data controls</p></div></div>
+      <div class="card">
+        <div class="card-header"><h3>Danger Zone</h3></div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="danger-zone">
+            <h4>Reset All Attempts</h4>
+            <p>Deletes all test attempts and question submissions. Students and tests are kept. All scores reset to 0.</p>
+            <div class="danger-actions">
+              <button class="btn btn-warning btn-sm" onclick="confirmAction('reset-attempts')">Reset All Attempts</button>
+            </div>
+          </div>
+          <div class="danger-zone">
+            <h4>Delete All Student Data</h4>
+            <p>Removes all student accounts along with their attempts and submissions. Tests and admin account are kept.</p>
+            <div class="danger-actions">
+              <button class="btn btn-danger btn-sm" onclick="confirmAction('reset-all')">Delete All Students &amp; Data</button>
+            </div>
+          </div>
+          <div class="danger-zone">
+            <h4>Delete All Tests</h4>
+            <p>Removes all tests, questions, test cases, and all associated attempt data permanently.</p>
+            <div class="danger-actions">
+              <button class="btn btn-danger btn-sm" onclick="confirmAction('delete-tests')">Delete All Tests</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Create/Edit Test Modal -->
+<div class="modal-overlay hidden" id="testModal">
+  <div class="modal" style="max-width:600px">
+    <h3 id="testModalTitle">Create New Test</h3>
+    <div class="form-group"><label>Test Title *</label><input type="text" id="testTitle" placeholder="e.g. Campus Placement Round 1"/></div>
+    <div class="form-group"><label>Description</label><textarea id="testDesc" placeholder="Brief description..."></textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label>Duration (minutes) *</label><input type="number" id="testDuration" value="60" min="1"/></div>
+      <div class="form-group">
+        <label>Total Marks <span style="color:var(--text2);font-size:11px">(auto-calculated from questions)</span></label>
+        <input type="number" id="testMarks" value="0" min="0" readonly style="opacity:0.6;cursor:not-allowed"/>
+      </div>
+    </div>
+    <div class="form-group"><label>Instructions for Students</label><textarea id="testInstructions" placeholder="Additional instructions..."></textarea></div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="testActive"><option value="1">Active</option><option value="0">Inactive</option></select>
+    </div>
+    <p id="testModalError" class="error-msg hidden"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('testModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTest()" id="saveTestBtn">Create Test</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Submission Modal -->
+<div class="modal-overlay hidden" id="submissionModal">
+  <div class="modal" style="max-width:860px">
+    <h3>Student Submission</h3>
+    <div id="submissionContent"><span class="loader"></span></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('submissionModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Action Modal -->
+<div class="confirm-overlay hidden" id="confirmOverlay">
+  <div class="confirm-box">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmMsg">This action cannot be undone.</p>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('confirmOverlay').classList.add('hidden')">Cancel</button>
+      <button class="btn btn-danger" id="confirmBtn" onclick="executeAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  if (!requireAuth('admin')) {}
+
+  let editingTestId = null;
+  let pendingAction = null;
+
+  // ── Sort state ──
+  let studentSortCol = 'name', studentSortDir = 'asc';
+  let resultSortCol  = 'name', resultSortDir  = 'asc';
+  let studentData = [], resultData = [];
+
+  function showSection(name, el) {
+    document.querySelectorAll('[id^="section-"]').forEach(s => s.classList.add('hidden'));
+    document.getElementById('section-' + name).classList.remove('hidden');
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (el) el.classList.add('active');
+    if (name === 'overview')  loadDashboard();
+    if (name === 'tests')     loadTests();
+    if (name === 'students')  loadStudents();
+    if (name === 'results')   loadResultsTestList();
+  }
+
+  function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+  // ── Dashboard ──
+  async function loadDashboard() {
+    try {
+      const data = await apiFetch('/admin/dashboard');
+      document.getElementById('stat-students').textContent = data.totalStudents;
+      document.getElementById('stat-tests').textContent    = data.totalTests;
+      document.getElementById('stat-attempts').textContent = data.totalAttempts;
+
+      document.getElementById('recentActivity').innerHTML = data.recentAttempts.length ? `
+        <table><thead><tr><th>Student</th><th>Enrollment</th><th>Test</th><th>Score</th><th>Status</th><th>Time</th></tr></thead>
+        <tbody>${data.recentAttempts.map(a => `
+          <tr>
+            <td>${a.name}</td>
+            <td>${a.enrollment || '-'}</td>
+            <td>${a.test_title}</td>
+            <td style="font-weight:600;color:var(--success)">${a.total_marks_obtained}</td>
+            <td><span class="badge ${a.status === 'submitted' ? 'badge-success' : 'badge-warning'}">${a.status}</span></td>
+            <td class="text-sm text-muted">${formatDate(a.submitted_at)}</td>
+          </tr>
+        `).join('')}</tbody></table>
+      ` : '<p class="text-muted text-center" style="padding:20px">No activity yet.</p>';
+    } catch(e) { console.error(e); }
+  }
+
+  // ── Tests ──
+  async function loadTests() {
+    const container = document.getElementById('testsContainer');
+    try {
+      const tests = await apiFetch('/admin/tests');
+      if (!tests.length) {
+        container.innerHTML = '<div class="card text-center text-muted" style="padding:40px">No tests yet. Create your first test!</div>';
+        return;
+      }
+      container.innerHTML = tests.map(t => `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>${t.title}</h3>
+              <div class="text-sm text-muted">${t.duration} min &middot; ${t.total_marks} marks &middot; <span class="badge ${t.is_active ? 'badge-success' : 'badge-danger'}">${t.is_active ? 'Active' : 'Inactive'}</span></div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <a href="test-editor.html?id=${t.id}" class="btn btn-ghost btn-sm">Edit Questions</a>
+              <button class="btn btn-ghost btn-sm" onclick="editTest('${t.id}')">Settings</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteTest('${t.id}')">Delete</button>
+            </div>
+          </div>
+          <p class="text-sm text-muted">${t.description || 'No description'}</p>
+        </div>
+      `).join('');
+    } catch(e) {
+      container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    }
+  }
+
+  function openCreateTest() {
+    editingTestId = null;
+    document.getElementById('testModalTitle').textContent = 'Create New Test';
+    document.getElementById('saveTestBtn').textContent = 'Create Test';
+    document.getElementById('testTitle').value = '';
+    document.getElementById('testDesc').value = '';
+    document.getElementById('testDuration').value = 60;
+    document.getElementById('testMarks').value = 0;
+    document.getElementById('testInstructions').value = '';
+    document.getElementById('testActive').value = '1';
+    document.getElementById('testModalError').classList.add('hidden');
+    document.getElementById('testModal').classList.remove('hidden');
+  }
+
+  async function editTest(id) {
+    editingTestId = id;
+    const test = await apiFetch(`/admin/tests/${id}`);
+    document.getElementById('testModalTitle').textContent = 'Edit Test';
+    document.getElementById('saveTestBtn').textContent = 'Save Changes';
+    document.getElementById('testTitle').value = test.title;
+    document.getElementById('testDesc').value = test.description || '';
+    document.getElementById('testDuration').value = test.duration;
+    document.getElementById('testMarks').value = test.total_marks;
+    document.getElementById('testInstructions').value = test.instructions || '';
+    document.getElementById('testActive').value = test.is_active;
+    document.getElementById('testModal').classList.remove('hidden');
+  }
+
+  async function saveTest() {
+    const btn = document.getElementById('saveTestBtn');
+    const err = document.getElementById('testModalError');
+    err.classList.add('hidden');
+    const body = {
+      title:        document.getElementById('testTitle').value,
+      description:  document.getElementById('testDesc').value,
+      duration:     parseInt(document.getElementById('testDuration').value),
+      total_marks:  parseInt(document.getElementById('testMarks').value) || 0,
+      instructions: document.getElementById('testInstructions').value,
+      is_active:    parseInt(document.getElementById('testActive').value)
+    };
+    if (!body.title || !body.duration) { showError(err, 'Title and duration are required'); return; }
+    btn.disabled = true;
+    try {
+      if (editingTestId) {
+        await apiFetch(`/admin/tests/${editingTestId}`, { method: 'PUT', body });
+      } else {
+        await apiFetch('/admin/tests', { method: 'POST', body });
+      }
+      closeModal('testModal');
+      loadTests();
+    } catch(e) {
+      showError(err, e.message);
+    } finally { btn.disabled = false; }
+  }
+
+  async function deleteTest(id) {
+    if (!confirm('Delete this test and all its data? This cannot be undone.')) return;
+    await apiFetch(`/admin/tests/${id}`, { method: 'DELETE' });
+    loadTests();
+  }
+
+  // ── Students ──
+  async function loadStudents() {
+    const container = document.getElementById('studentsContainer');
+    try {
+      studentData = await apiFetch('/admin/students');
+      renderStudents();
+    } catch(e) {
+      container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    }
+  }
+
+  function renderStudents() {
+    const container = document.getElementById('studentsContainer');
+    if (!studentData.length) {
+      container.innerHTML = '<div class="card text-center text-muted" style="padding:40px">No students registered yet.</div>';
+      return;
+    }
+    const sorted = sortData(studentData, studentSortCol, studentSortDir);
+    const cols = [
+      { key: 'name',          label: 'Name' },
+      { key: 'enrollment',    label: 'Enrollment' },
+      { key: 'email',         label: 'Email' },
+      { key: 'attempt_count', label: 'Attempts' },
+      { key: 'total_marks',   label: 'Total Marks' },
+      { key: 'created_at',    label: 'Registered' },
+    ];
+    container.innerHTML = `
+      <div class="card"><div class="table-wrap"><table>
+        <thead><tr>
+          ${cols.map(c => `<th class="sortable${studentSortCol===c.key ? (studentSortDir==='asc' ? ' sort-asc' : ' sort-desc') : ''}" onclick="sortStudents('${c.key}')">${c.label}</th>`).join('')}
+          <th>Action</th>
+        </tr></thead>
+        <tbody>${sorted.map(s => `
+          <tr>
+            <td>${s.name}</td>
+            <td>${s.enrollment || '-'}</td>
+            <td>${s.email}</td>
+            <td>${s.attempt_count}</td>
+            <td style="font-weight:600;color:var(--success)">${s.total_marks}</td>
+            <td class="text-sm text-muted">${formatDate(s.created_at)}</td>
+            <td><button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}','${s.name}')">Delete</button></td>
+          </tr>
+        `).join('')}</tbody>
+      </table></div></div>`;
+  }
+
+  function sortStudents(col) {
+    if (studentSortCol === col) studentSortDir = studentSortDir === 'asc' ? 'desc' : 'asc';
+    else { studentSortCol = col; studentSortDir = 'asc'; }
+    renderStudents();
+  }
+
+  async function deleteStudent(id, name) {
+    if (!confirm(`Delete student "${name}" and all their data?`)) return;
+    await apiFetch(`/admin/students/${id}`, { method: 'DELETE' });
+    loadStudents();
+    loadDashboard();
+  }
+
+  // ── Results ──
+  async function loadResultsTestList() {
+    const sel = document.getElementById('resultTestSelect');
+    const tests = await apiFetch('/admin/tests');
+    sel.innerHTML = '<option value="">-- Select a test --</option>' +
+      tests.map(t => `<option value="${t.id}">${t.title}</option>`).join('');
+  }
+
+  async function loadResults() {
+    const testId = document.getElementById('resultTestSelect').value;
+    const container = document.getElementById('resultsContainer');
+    if (!testId) { container.innerHTML = ''; return; }
+    container.innerHTML = '<div class="text-center" style="padding:20px"><span class="loader"></span></div>';
+    try {
+      resultData = await apiFetch(`/admin/tests/${testId}/results`);
+      renderResults();
+    } catch(e) {
+      container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    }
+  }
+
+  function renderResults() {
+    const container = document.getElementById('resultsContainer');
+    if (!resultData.length) {
+      container.innerHTML = '<div class="card text-center text-muted" style="padding:30px">No submissions yet.</div>';
+      return;
+    }
+    const sorted = sortData(resultData, resultSortCol, resultSortDir);
+    const cols = [
+      { key: 'name',                 label: 'Name' },
+      { key: 'enrollment',           label: 'Enrollment' },
+      { key: 'email',                label: 'Email' },
+      { key: 'total_marks_obtained', label: 'Score' },
+      { key: 'status',               label: 'Status' },
+      { key: 'tab_switches',         label: 'Tab Switches' },
+      { key: 'submitted_at',         label: 'Submitted At' },
+    ];
+    container.innerHTML = `
+      <div class="card"><div class="table-wrap"><table>
+        <thead><tr>
+          ${cols.map(c => `<th class="sortable${resultSortCol===c.key ? (resultSortDir==='asc' ? ' sort-asc' : ' sort-desc') : ''}" onclick="sortResults('${c.key}')">${c.label}</th>`).join('')}
+          <th>Action</th>
+        </tr></thead>
+        <tbody>${sorted.map(a => `
+          <tr>
+            <td>${a.name}</td>
+            <td>${a.enrollment || '-'}</td>
+            <td>${a.email}</td>
+            <td style="font-weight:600;color:var(--success)">${a.total_marks_obtained}</td>
+            <td>
+              <span class="badge ${a.status === 'submitted' ? 'badge-success' : 'badge-warning'}">${a.status}</span>
+              ${a.auto_submitted ? '<span class="badge badge-danger" style="margin-left:4px">Auto</span>' : ''}
+            </td>
+            <td>${a.tab_switches}</td>
+            <td class="text-sm text-muted">${formatDate(a.submitted_at)}</td>
+            <td><button class="btn btn-ghost btn-sm" onclick="viewSubmission('${a.id}')">View Code</button></td>
+          </tr>
+        `).join('')}</tbody>
+      </table></div></div>`;
+  }
+
+  function sortResults(col) {
+    if (resultSortCol === col) resultSortDir = resultSortDir === 'asc' ? 'desc' : 'asc';
+    else { resultSortCol = col; resultSortDir = 'asc'; }
+    renderResults();
+  }
+
+  function sortData(arr, col, dir) {
+    return [...arr].sort((a, b) => {
+      let va = a[col], vb = b[col];
+      if (va == null) va = '';
+      if (vb == null) vb = '';
+      if (typeof va === 'number' && typeof vb === 'number') return dir === 'asc' ? va - vb : vb - va;
+      return dir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    });
+  }
+
+  async function viewSubmission(attemptId) {
+    document.getElementById('submissionModal').classList.remove('hidden');
+    document.getElementById('submissionContent').innerHTML = '<div style="padding:20px;text-align:center"><span class="loader"></span></div>';
+    try {
+      const data = await apiFetch(`/admin/attempts/${attemptId}`);
+      document.getElementById('submissionContent').innerHTML = `
+        <div class="alert alert-info" style="margin-bottom:16px">
+          <strong>${data.name}</strong> (${data.enrollment || 'N/A'}) &nbsp;&middot;&nbsp; Total: <strong>${data.total_marks_obtained} marks</strong>
+          ${data.auto_submitted ? ' &nbsp;&middot;&nbsp; <span style="color:var(--danger)">Auto-submitted</span>' : ''}
+          &nbsp;&middot;&nbsp; Tab switches: ${data.tab_switches}
+        </div>
+        ${data.submissions.length ? data.submissions.map(s => `
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-header">
+              <div><strong>${s.question_title}</strong> <span class="text-muted text-sm">(${s.language})</span></div>
+              <span class="badge badge-${s.marks_obtained > 0 ? 'success' : 'danger'}">${s.marks_obtained} marks &nbsp;&middot;&nbsp; ${s.test_cases_passed}/${s.total_test_cases} passed</span>
+            </div>
+            <pre style="background:#0d1117;border:1px solid #30363d;padding:14px;border-radius:6px;font-family:'Cascadia Code','Fira Code',monospace;font-size:12px;overflow-x:auto;max-height:220px;overflow-y:auto;color:#e6edf3;line-height:1.5">${escapeHtml(s.code)}</pre>
+          </div>
+        `).join('') : '<p class="text-muted">No question submissions found.</p>'}
+      `;
+    } catch(e) {
+      document.getElementById('submissionContent').innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    }
+  }
+
+  // ── Danger Zone ──
+  const ACTION_CONFIG = {
+    'reset-attempts': {
+      title: 'Reset All Attempts?',
+      msg: 'This will delete all test attempts and submissions. Student accounts and tests are kept. All scores reset to 0.',
+      btnText: 'Yes, Reset Attempts', btnClass: 'btn-warning'
+    },
+    'reset-all': {
+      title: 'Delete All Student Data?',
+      msg: 'This will permanently delete ALL student accounts, attempts, and submissions. Tests and admin account are kept.',
+      btnText: 'Yes, Delete All Students', btnClass: 'btn-danger'
+    },
+    'delete-tests': {
+      title: 'Delete All Tests?',
+      msg: 'This will permanently delete ALL tests, questions, test cases, and all attempt data. This cannot be undone.',
+      btnText: 'Yes, Delete All Tests', btnClass: 'btn-danger'
+    }
+  };
+
+  function confirmAction(action) {
+    pendingAction = action;
+    const cfg = ACTION_CONFIG[action];
+    document.getElementById('confirmTitle').textContent = cfg.title;
+    document.getElementById('confirmMsg').textContent   = cfg.msg;
+    const btn = document.getElementById('confirmBtn');
+    btn.textContent  = cfg.btnText;
+    btn.className    = 'btn ' + cfg.btnClass;
+    document.getElementById('confirmOverlay').classList.remove('hidden');
+  }
+
+  async function executeAction() {
+    document.getElementById('confirmOverlay').classList.add('hidden');
+    const btn = document.getElementById('confirmBtn');
+    btn.disabled = true;
+    try {
+      if (pendingAction === 'reset-attempts') {
+        await apiFetch('/admin/reset/attempts', { method: 'DELETE' });
+        alert('All attempts have been reset.');
+      } else if (pendingAction === 'reset-all') {
+        await apiFetch('/admin/reset/all', { method: 'DELETE' });
+        alert('All student data has been deleted.');
+      } else if (pendingAction === 'delete-tests') {
+        const tests = await apiFetch('/admin/tests');
+        for (const t of tests) await apiFetch(`/admin/tests/${t.id}`, { method: 'DELETE' });
+        alert('All tests have been deleted.');
+      }
+      loadDashboard();
+    } catch(e) {
+      alert('Error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      pendingAction = null;
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

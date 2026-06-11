@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Student Register - Code7</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div style="text-align:center;margin-bottom:24px">
+      <span style="font-size:2rem">🎓</span>
+      <h2>Create Account</h2>
+      <p class="subtitle">Register to take placement tests</p>
+    </div>
+    <form id="registerForm">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="name" placeholder="John Doe" required/>
+      </div>
+      <div class="form-group">
+        <label>Enrollment Number</label>
+        <input type="text" id="enrollment" placeholder="e.g. 21CS001" required/>
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="email" placeholder="your@email.com" required/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Min 6 characters" required minlength="6"/>
+      </div>
+      <button type="submit" class="btn btn-primary w-full" id="submitBtn">Create Account</button>
+      <p id="errorMsg" class="error-msg hidden"></p>
+      <p id="successMsg" class="success-msg hidden"></p>
+    </form>
+    <div class="auth-footer">
+      Already registered? <a href="login.html">Login here</a>
+      <br/><br/>
+      <a href="/">← Back to Home</a>
+    </div>
+  </div>
+</div>
+<script src="../js/api.js"></script>
+<script>
+  document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    const err = document.getElementById('errorMsg');
+    const suc = document.getElementById('successMsg');
+    err.classList.add('hidden');
+    suc.classList.add('hidden');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loader"></span>';
+    try {
+      await apiFetch('/auth/register', {
+        method: 'POST',
+        body: {
+          name: document.getElementById('name').value,
+          enrollment: document.getElementById('enrollment').value,
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value
+        }
+      });
+      showSuccess(suc, 'Registered successfully! Redirecting to login...');
+      setTimeout(() => window.location.href = 'login.html', 1500);
+    } catch(err2) {
+      showError(err, err2.message);
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+    }
+  });
+</script>
+</body>
+</html>

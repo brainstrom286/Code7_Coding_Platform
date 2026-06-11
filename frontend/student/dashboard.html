@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Student Dashboard - Code7</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<div class="dashboard">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h2>Code7</h2>
+      <p id="studentName">Student</p>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" onclick="showSection('tests')">Available Tests</a>
+      <a class="nav-item" onclick="showSection('history')">My Results</a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn btn-ghost w-full" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <!-- Tests Section -->
+    <div id="section-tests">
+      <div class="page-header">
+        <div>
+          <h2>Available Tests</h2>
+          <p>Select a test to begin your assessment</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadTests()">Refresh</button>
+      </div>
+      <div id="testsContainer">
+        <div class="text-center text-muted" style="padding:40px"><span class="loader"></span></div>
+      </div>
+    </div>
+
+    <!-- History Section -->
+    <div id="section-history" class="hidden">
+      <div class="page-header">
+        <div>
+          <h2>My Results</h2>
+          <p>Your test history and scores</p>
+        </div>
+      </div>
+      <div id="historyContainer">
+        <div class="text-center text-muted" style="padding:40px"><span class="loader"></span></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  if (!requireAuth('student')) {}
+
+  const user = getUser();
+  document.getElementById('studentName').textContent = user?.name || 'Student';
+
+  function showSection(name) {
+    document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden'));
+    document.getElementById('section-' + name).classList.remove('hidden');
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    event.target.closest('.nav-item').classList.add('active');
+    if (name === 'tests') loadTests();
+    if (name === 'history') loadHistory();
+  }
+
+  async function loadTests() {
+    const container = document.getElementById('testsContainer');
+    try {
+      const tests = await apiFetch('/student/tests');
+      if (!tests.length) {
+        container.innerHTML = '<div class="card text-center text-muted" style="padding:40px">No tests available right now.</div>';
+        return;
+      }
+      container.innerHTML = '<div class="test-grid">' + tests.map(t => `
+        <div class="test-card">
+          <h3>${t.title}</h3>
+          <p class="text-sm text-muted">${t.description || 'No description'}</p>
+          <div class="meta">
+            <span>${t.duration} min</span>
+            <span>${t.total_marks} marks</span>
+          </div>
+          ${t.attempt ? (
+            t.attempt.status === 'submitted'
+              ? `<div class="alert alert-success" style="margin:0">Submitted — Score: ${t.attempt.total_marks_obtained}/${t.total_marks}</div>`
+              : `<a href="instructions.html?testId=${t.id}&attemptId=${t.attempt.id}" class="btn btn-warning w-full">Resume Test</a>`
+          ) : `<a href="instructions.html?testId=${t.id}" class="btn btn-primary w-full">Start Test</a>`}
+        </div>
+      `).join('') + '</div>';
+    } catch(e) {
+      container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    }
+  }
+
+  async function loadHistory() {
+    const container = document.getElementById('historyContainer');
+    try {
+      const tests = await apiFetch('/student/tests');
+      const attempted = tests.filter(t => t.attempt && t.attempt.status === 'submitted');
+      if (!attempted.length) {
+        container.innerHTML = '<div class="card text-center text-muted" style="padding:40px">No completed tests yet.</div>';
+        return;
+      }
+      container.innerHTML = `<div class="card"><div class="table-wrap"><table>
+        <thead><tr><th>Test</th><th>Score</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody>${attempted.map(t => `
+          <tr>
+            <td>${t.title}</td>
+            <td style="color:var(--success);font-weight:600">${t.attempt.total_marks_obtained}</td>
+            <td>${t.total_marks}</td>
+            <td><span class="badge badge-success">Submitted</span></td>
+          </tr>
+        `).join('')}</tbody>
+      </table></div></div>`;
+    } catch(e) {
+      container.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    }
+  }
+
+  loadTests();
+</script>
+</body>
+</html>

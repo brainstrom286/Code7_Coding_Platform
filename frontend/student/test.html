@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Test - Code7</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <style>
+    body { overflow: hidden; }
+
+    .tab-warning {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: var(--warning); color: #000;
+      padding: 10px; text-align: center; font-weight: 600;
+      z-index: 9999; font-size: 14px;
+      animation: slideDown 0.3s ease;
+    }
+    @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
+    .submit-confirm {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center; z-index: 2000;
+    }
+    .submit-confirm-box {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 16px; padding: 32px; max-width: 420px; width: 90%; text-align: center;
+    }
+    .submit-confirm-box h3 { font-size: 1.2rem; margin-bottom: 10px; }
+    .submit-confirm-box p { color: var(--text2); font-size: 14px; margin-bottom: 24px; line-height: 1.6; }
+
+    /* ── Test case result cards ── */
+    .tc-card {
+      background: #0d1117;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      border: 1px solid #30363d;
+    }
+    .tc-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px;
+      font-size: 13px; font-weight: 600;
+      border-bottom: 1px solid #30363d;
+    }
+    .tc-card-header.pass {
+      background: rgba(34,197,94,0.1);
+      border-bottom-color: rgba(34,197,94,0.25);
+      color: #4ade80;
+    }
+    .tc-card-header.fail {
+      background: rgba(239,68,68,0.1);
+      border-bottom-color: rgba(239,68,68,0.25);
+      color: #f87171;
+    }
+    .tc-card-header.error {
+      background: rgba(245,158,11,0.1);
+      border-bottom-color: rgba(245,158,11,0.25);
+      color: #fbbf24;
+    }
+    .tc-card-body {
+      padding: 12px 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .tc-card-body.full { grid-template-columns: 1fr; }
+    .tc-field label {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #8b949e;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+    .tc-field pre {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 5px;
+      padding: 8px 10px;
+      font-family: 'Cascadia Code','Fira Code','Consolas',monospace;
+      font-size: 12px;
+      color: #e6edf3;
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 80px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+    .tc-field pre.expected { border-color: rgba(34,197,94,0.3); }
+    .tc-field pre.actual-pass { border-color: rgba(34,197,94,0.5); color: #4ade80; }
+    .tc-field pre.actual-fail { border-color: rgba(239,68,68,0.4); color: #f87171; }
+    .tc-field pre.actual-error { border-color: rgba(245,158,11,0.4); color: #fbbf24; }
+
+    /* Summary bar after submit */
+    .eval-summary {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .eval-summary.all-pass { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; }
+    .eval-summary.partial  { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: #fbbf24; }
+    .eval-summary.all-fail { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.3);  color: #f87171; }
+    .eval-summary .score-pill {
+      margin-left: auto;
+      background: rgba(255,255,255,0.08);
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    /* Running spinner overlay in output */
+    .running-msg {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--text2); font-size: 13px; padding: 8px 0;
+    }
+  </style>
+</head>
+<body>
+<div id="tabWarning" class="tab-warning hidden"></div>
+
+<div class="test-env" id="testEnv">
+  <!-- Header -->
+  <div class="test-header">
+    <div>
+      <div class="test-title" id="testTitle">Loading...</div>
+      <div class="text-sm text-muted" id="tabSwitchInfo">Tab switches: 0/3</div>
+    </div>
+    <div class="timer" id="timer">--:--</div>
+    <button class="btn btn-danger btn-sm" onclick="confirmSubmit()">Submit Test</button>
+  </div>
+
+  <!-- Question Nav -->
+  <div class="question-nav" id="questionNav"></div>
+
+  <!-- Body -->
+  <div class="test-body">
+    <!-- Problem Panel -->
+    <div class="problem-panel" id="problemPanel">
+      <div class="text-center text-muted" style="padding:40px"><span class="loader"></span></div>
+    </div>
+
+    <!-- Editor Panel -->
+    <div class="editor-panel">
+      <div class="editor-toolbar">
+        <select id="langSelect" onchange="onLangChange()">
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="java">Java</option>
+          <option value="cpp">C++</option>
+          <option value="c">C</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="runCode()" id="runBtn">▶ Run</button>
+        <button class="btn btn-success btn-sm" onclick="submitQuestion()" id="submitQBtn">✓ Submit Question</button>
+        <span id="submitStatus" class="text-sm text-muted"></span>
+      </div>
+      <textarea id="code-editor" spellcheck="false" placeholder="Write your code here..."></textarea>
+      <div class="output-panel">
+        <div class="output-tabs">
+          <div class="output-tab active" id="tab-btn-output" onclick="switchTab('output', this)">Output</div>
+          <div class="output-tab" id="tab-btn-results" onclick="switchTab('results', this)">Test Results</div>
+        </div>
+        <div class="output-content" id="tab-output">
+          <span class="text-muted text-sm">Run your code to see output here.</span>
+        </div>
+        <div class="output-content hidden" id="tab-results">
+          <span class="text-muted text-sm">Submit a question to see evaluation results.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Submit Confirm Modal -->
+<div class="submit-confirm hidden" id="submitConfirm">
+  <div class="submit-confirm-box">
+    <h3>Submit Test?</h3>
+    <p id="submitConfirmMsg">Are you sure you want to submit? This action cannot be undone.</p>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button class="btn btn-ghost" onclick="document.getElementById('submitConfirm').classList.add('hidden')">Cancel</button>
+      <button class="btn btn-danger" onclick="submitTest()">Yes, Submit</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script>
+  if (!requireAuth('student')) {}
+
+  const params = new URLSearchParams(location.search);
+  const attemptId = params.get('attemptId');
+  const durationMin = parseInt(params.get('duration')) || 60;
+  if (!attemptId) window.location.href = 'dashboard.html';
+
+  let questions = [];
+  let currentQIndex = 0;
+  let timerSeconds = durationMin * 60;
+  let timerInterval = null;
+  let tabSwitches = 0;
+  const MAX_TAB_SWITCHES = 2;
+  let answered = {};
+  let savedCode = {};
+
+  // ── Run rate limiting ──
+  let lastRunTime = 0;
+  const RUN_COOLDOWN_MS = 10000; // 10 seconds between runs
+
+  // ── Fullscreen ──
+  function enterFullscreen() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }
+
+  // ── Tab switch detection ──
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      tabSwitches++;
+      updateTabSwitchUI();
+      apiFetch(`/student/attempts/${attemptId}/tab-switch`, { method: 'PATCH' }).catch(() => {});
+      if (tabSwitches >= MAX_TAB_SWITCHES) {
+        showTabWarning(`⚠️ Too many tab switches (${tabSwitches}). Auto-submitting test...`);
+        setTimeout(() => submitTest(true), 3000);
+      } else {
+        showTabWarning(`⚠️ Tab switch detected! (${tabSwitches}/${MAX_TAB_SWITCHES}) — ${MAX_TAB_SWITCHES - tabSwitches} more will auto-submit.`);
+      }
+    }
+  });
+
+  function showTabWarning(msg) {
+    const el = document.getElementById('tabWarning');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 5000);
+  }
+
+  function updateTabSwitchUI() {
+    document.getElementById('tabSwitchInfo').textContent = `Tab switches: ${tabSwitches}/${MAX_TAB_SWITCHES}`;
+    if (tabSwitches >= 2) document.getElementById('tabSwitchInfo').style.color = 'var(--danger)';
+    else if (tabSwitches >= 1) document.getElementById('tabSwitchInfo').style.color = 'var(--warning)';
+  }
+
+  // ── Timer ──
+  function startTimer() {
+    const el = document.getElementById('timer');
+    el.textContent = formatTime(timerSeconds);
+    timerInterval = setInterval(() => {
+      timerSeconds--;
+      el.textContent = formatTime(timerSeconds);
+      if (timerSeconds <= 300) el.className = 'timer danger';
+      else if (timerSeconds <= 600) el.className = 'timer warning';
+      if (timerSeconds <= 0) {
+        clearInterval(timerInterval);
+        showTabWarning('⏰ Time is up! Auto-submitting...');
+        setTimeout(() => submitTest(true), 2000);
+      }
+    }, 1000);
+  }
+
+  // ── Load test ──
+  async function loadTest() {
+    try {
+      const data = await apiFetch(`/student/attempts/${attemptId}/questions`);
+      questions = data.questions;
+
+      // Calculate remaining time from server startedAt
+      const totalSec = durationMin * 60;
+      if (data.startedAt) {
+        const elapsed = Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 1000);
+        timerSeconds = Math.max(totalSec - elapsed, 0);
+      } else {
+        timerSeconds = totalSec;
+      }
+
+      // If time already expired, auto-submit immediately
+      if (timerSeconds <= 0) {
+        await submitTest(true);
+        return;
+      }
+
+      for (const q of questions) {
+        if (q.saved) {
+          savedCode[q.id] = { code: q.saved.code, lang: q.saved.language };
+          answered[q.id] = true;
+        }
+      }
+
+      renderQuestionNav();
+      renderQuestion(0);
+      startTimer();
+      enterFullscreen();
+    } catch(e) {
+      document.getElementById('problemPanel').innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    }
+  }
+
+  // ── Question nav ──
+  function renderQuestionNav() {
+    document.getElementById('questionNav').innerHTML = questions.map((q, i) => `
+      <button class="q-btn ${i === currentQIndex ? 'active' : ''} ${answered[q.id] ? 'answered' : ''}"
+        onclick="renderQuestion(${i})">${i + 1}</button>
+    `).join('');
+  }
+
+  // ── Render question ──
+  function renderQuestion(index) {
+    if (questions[currentQIndex]) {
+      const qid = questions[currentQIndex].id;
+      savedCode[qid] = {
+        code: document.getElementById('code-editor').value,
+        lang: document.getElementById('langSelect').value
+      };
+    }
+
+    currentQIndex = index;
+    const q = questions[index];
+    if (!q) return;
+
+    const marksPerCase = q.hidden_count > 0
+      ? (q.marks / q.hidden_count).toFixed(1)
+      : q.marks;
+
+    document.getElementById('problemPanel').innerHTML = `
+      <div class="problem-title">Q${index + 1}. ${q.title}</div>
+      <div class="problem-marks">
+        🏆 ${q.marks} marks
+        <span style="color:var(--text2);font-size:12px;margin-left:8px">
+          (${q.hidden_count} test case${q.hidden_count !== 1 ? 's' : ''} × ${marksPerCase} marks each)
+        </span>
+      </div>
+      <div class="problem-section">
+        <h4>Problem Statement</h4>
+        <p>${escHtml(q.problem_statement).replace(/\n/g, '<br/>')}</p>
+      </div>
+      ${q.input_format ? `<div class="problem-section"><h4>Input Format</h4><p>${escHtml(q.input_format).replace(/\n/g,'<br/>')}</p></div>` : ''}
+      ${q.output_format ? `<div class="problem-section"><h4>Output Format</h4><p>${escHtml(q.output_format).replace(/\n/g,'<br/>')}</p></div>` : ''}
+      ${q.constraints ? `<div class="problem-section"><h4>Constraints</h4><pre>${escHtml(q.constraints)}</pre></div>` : ''}
+      ${q.image_url ? `<div class="problem-section"><h4>Reference Image</h4><img src="${q.image_url}" alt="Question image" style="max-width:100%;border-radius:6px;border:1px solid var(--border);margin-top:6px"/></div>` : ''}
+      ${q.sample_cases.length ? `
+        <div class="problem-section">
+          <h4>Sample Test Cases</h4>
+          ${q.sample_cases.map((tc, i) => `
+            <div class="sample-case">
+              <div class="label" style="font-weight:600;margin-bottom:8px">Example ${i + 1}</div>
+              <div class="label">Input:</div>
+              <pre style="margin:4px 0 8px">${escHtml(tc.input)}</pre>
+              <div class="label">Expected Output:</div>
+              <pre style="margin:4px 0 ${tc.explanation ? '8px' : '0'}">${escHtml(tc.expected_output)}</pre>
+              ${tc.explanation ? `<div class="label" style="margin-top:4px;font-style:italic">💡 ${escHtml(tc.explanation)}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    `;
+
+    const saved = savedCode[q.id];
+    if (saved) {
+      document.getElementById('code-editor').value = saved.code;
+      document.getElementById('langSelect').value = saved.lang;
+    } else {
+      const lang = document.getElementById('langSelect').value;
+      const bp = q.boilerplate?.find(b => b.language === lang);
+      document.getElementById('code-editor').value = bp ? bp.code : getDefaultBoilerplate(lang);
+    }
+
+    document.getElementById('submitStatus').textContent = answered[q.id] ? '✅ Submitted' : '';
+    document.getElementById('tab-output').innerHTML = '<span class="text-muted text-sm">Run your code to see output here.</span>';
+    document.getElementById('tab-results').innerHTML = '<span class="text-muted text-sm">Submit a question to see evaluation results.</span>';
+    renderQuestionNav();
+  }
+
+  function onLangChange() {
+    const q = questions[currentQIndex];
+    if (!q) return;
+    const lang = document.getElementById('langSelect').value;
+    const bp = q.boilerplate?.find(b => b.language === lang);
+    document.getElementById('code-editor').value = bp ? bp.code : getDefaultBoilerplate(lang);
+  }
+
+  function getDefaultBoilerplate(lang) {
+    const t = {
+      python:     '# Write your solution here\n\n',
+      javascript: '// Write your solution here\n\n',
+      java:       'import java.util.*;\n\npublic class Solution {\n    public static void main(String[] args) {\n        // Write your solution here\n    }\n}',
+      cpp:        '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // Write your solution here\n    return 0;\n}',
+      c:          '#include <stdio.h>\n\nint main() {\n    // Write your solution here\n    return 0;\n}'
+    };
+    return t[lang] || '// Write your solution here\n';
+  }
+
+  function switchTab(name, el) {
+    document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.output-content').forEach(t => t.classList.add('hidden'));
+    el.classList.add('active');
+    document.getElementById('tab-' + name).classList.remove('hidden');
+  }
+
+  // ── Run code ──
+  async function runCode() {
+    const q = questions[currentQIndex];
+    if (!q) return;
+    const code = document.getElementById('code-editor').value.trim();
+    if (!code) return;
+
+    const now = Date.now();
+    const remaining = Math.ceil((RUN_COOLDOWN_MS - (now - lastRunTime)) / 1000);
+    if (now - lastRunTime < RUN_COOLDOWN_MS) {
+      const outputEl = document.getElementById('tab-output');
+      switchTab('output', document.getElementById('tab-btn-output'));
+      outputEl.innerHTML = `<div class="alert alert-warning" style="margin:0">Too many requests — please wait ${remaining}s before running again.</div>`;
+      return;
+    }
+    lastRunTime = now;
+
+    const outputEl = document.getElementById('tab-output');
+    const runBtn = document.getElementById('runBtn');
+    outputEl.innerHTML = '<div class="running-msg"><span class="loader"></span> Running against sample test cases...</div>';
+    switchTab('output', document.getElementById('tab-btn-output'));
+    runBtn.disabled = true;
+
+    try {
+      const res = await apiFetch('/student/run', {
+        method: 'POST',
+        body: { code, language: document.getElementById('langSelect').value, question_id: q.id }
+      });
+
+      if (!res.results.length) {
+        outputEl.innerHTML = '<span class="text-muted text-sm">No sample test cases defined for this question.</span>';
+        return;
+      }
+
+      outputEl.innerHTML = res.results.map((r, i) => buildTcCard(r, i, true)).join('');
+    } catch(e) {
+      outputEl.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    } finally {
+      runBtn.disabled = false;
+      // Show cooldown countdown on button
+      let cd = Math.ceil(RUN_COOLDOWN_MS / 1000);
+      runBtn.textContent = `▶ Run (${cd}s)`;
+      const cdInterval = setInterval(() => {
+        cd--;
+        if (cd <= 0) { clearInterval(cdInterval); runBtn.textContent = '▶ Run'; }
+        else runBtn.textContent = `▶ Run (${cd}s)`;
+      }, 1000);
+    }
+  }
+
+  // ── Submit question ──
+  async function submitQuestion() {
+    const q = questions[currentQIndex];
+    if (!q) return;
+    const code = document.getElementById('code-editor').value.trim();
+    if (!code) { alert('Please write your solution before submitting.'); return; }
+
+    const language = document.getElementById('langSelect').value;
+    const btn = document.getElementById('submitQBtn');
+    const status = document.getElementById('submitStatus');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loader"></span> Evaluating...';
+    status.textContent = '';
+
+    const resultsEl = document.getElementById('tab-results');
+    resultsEl.innerHTML = '<div class="running-msg"><span class="loader"></span> Running against hidden test cases...</div>';
+    switchTab('results', document.getElementById('tab-btn-results'));
+
+    try {
+      const res = await apiFetch(`/student/attempts/${attemptId}/submit-question`, {
+        method: 'POST',
+        body: { question_id: q.id, language, code }
+      });
+
+      answered[q.id] = true;
+      savedCode[q.id] = { code, lang: language };
+
+      const allPass = res.passed === res.total;
+      const nonePass = res.passed === 0;
+      const summaryClass = allPass ? 'all-pass' : nonePass ? 'all-fail' : 'partial';
+      const summaryIcon = allPass ? '✅' : nonePass ? '❌' : '⚠️';
+
+      status.textContent = `${res.marksObtained}/${res.maxMarks} marks`;
+      status.style.color = allPass ? 'var(--success)' : nonePass ? 'var(--danger)' : 'var(--warning)';
+
+      resultsEl.innerHTML = `
+        <div class="eval-summary ${summaryClass}">
+          <span>${summaryIcon} ${res.passed} / ${res.total} hidden test cases passed</span>
+          <span class="score-pill">${res.marksObtained} / ${res.maxMarks} marks</span>
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px">
+          Each test case is worth ${(res.maxMarks / res.total).toFixed(1)} marks
+        </div>
+      `;
+
+      renderQuestionNav();
+    } catch(e) {
+      status.textContent = '❌ Error';
+      resultsEl.innerHTML = `<div class="alert alert-danger">${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '✓ Submit Question';
+    }
+  }
+
+  // ── Build test case card ──
+  function buildTcCard(r, i, showInput) {
+    const isError = r.actual_output && r.actual_output.startsWith('Error:');
+    const isTLE = r.actual_output === 'Time Limit Exceeded';
+    const headerClass = isError || isTLE ? 'error' : r.passed ? 'pass' : 'fail';
+    const icon = isError || isTLE ? '⚠️' : r.passed ? '✅' : '❌';
+    const label = isError ? 'Runtime Error' : isTLE ? 'Time Limit Exceeded' : r.passed ? 'Passed' : 'Wrong Answer';
+
+    const actualClass = isError || isTLE ? 'actual-error' : r.passed ? 'actual-pass' : 'actual-fail';
+
+    return `
+      <div class="tc-card">
+        <div class="tc-card-header ${headerClass}">
+          <span>${icon} Test Case ${i + 1}</span>
+          <span style="font-weight:400;font-size:12px">${label}</span>
+        </div>
+        <div class="tc-card-body">
+          ${showInput ? `
+          <div class="tc-field">
+            <label>Input</label>
+            <pre>${escHtml(r.input)}</pre>
+          </div>` : ''}
+          <div class="tc-field">
+            <label>Expected Output</label>
+            <pre class="expected">${escHtml(r.expected_output)}</pre>
+          </div>
+          <div class="tc-field ${showInput ? '' : ''}">
+            <label>Your Output</label>
+            <pre class="${actualClass}">${escHtml(r.actual_output || '')}</pre>
+          </div>
+          ${r.explanation ? `<div class="tc-field" style="grid-column:1/-1"><label>Explanation</label><pre style="color:var(--text2)">${escHtml(r.explanation)}</pre></div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Confirm submit ──
+  function confirmSubmit() {
+    const unanswered = questions.filter(q => !answered[q.id]).length;
+    document.getElementById('submitConfirmMsg').textContent =
+      unanswered > 0
+        ? `You have ${unanswered} unanswered question(s). Unanswered questions will receive 0 marks. Submit anyway?`
+        : 'All questions answered. Ready to submit your test?';
+    document.getElementById('submitConfirm').classList.remove('hidden');
+  }
+
+  // ── Final submit ──
+  async function submitTest(auto = false) {
+    clearInterval(timerInterval);
+    document.getElementById('submitConfirm').classList.add('hidden');
+    try {
+      if (questions[currentQIndex]) {
+        const qid = questions[currentQIndex].id;
+        const code = document.getElementById('code-editor').value.trim();
+        const language = document.getElementById('langSelect').value;
+        if (code && !answered[qid]) {
+          await apiFetch(`/student/attempts/${attemptId}/submit-question`, {
+            method: 'POST',
+            body: { question_id: qid, language, code }
+          }).catch(() => {});
+        }
+      }
+      const res = await apiFetch(`/student/attempts/${attemptId}/submit`, {
+        method: 'POST',
+        body: { tab_switches: tabSwitches, auto_submitted: auto }
+      });
+      window.location.href = `result.html?score=${res.total}&auto=${auto}`;
+    } catch(e) {
+      alert('Submission failed: ' + e.message);
+    }
+  }
+
+  // Tab key in editor
+  document.getElementById('code-editor').addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const ta = e.target;
+      const start = ta.selectionStart;
+      ta.value = ta.value.substring(0, start) + '  ' + ta.value.substring(ta.selectionEnd);
+      ta.selectionStart = ta.selectionEnd = start + 2;
+    }
+  });
+
+  // ── Auto-save current question code every 30s ──
+  setInterval(() => {
+    const q = questions[currentQIndex];
+    if (!q) return;
+    const code = document.getElementById('code-editor').value.trim();
+    const language = document.getElementById('langSelect').value;
+    if (!code) return;
+    // Save silently to DB (upsert via submit-question but without marking as answered)
+    apiFetch(`/student/attempts/${attemptId}/autosave`, {
+      method: 'POST',
+      body: { question_id: q.id, language, code }
+    }).catch(() => {});
+  }, 30000);
+
+  loadTest();
+</script>
+</body>
+</html>
