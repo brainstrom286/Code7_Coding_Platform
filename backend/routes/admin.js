@@ -305,6 +305,12 @@ router.delete('/reset/attempts', wrap(async (req, res) => {
   res.json({ message: 'All attempts reset' });
 }));
 
+// Delete all tests (cascades questions, test cases, attempts, submissions)
+router.delete('/reset/tests', wrap(async (req, res) => {
+  await db.run('DELETE FROM tests');
+  res.json({ message: 'All tests deleted' });
+}));
+
 // Delete single student
 router.delete('/students/:id', wrap(async (req, res) => {
   await db.run('DELETE FROM question_submissions WHERE attempt_id IN (SELECT id FROM test_attempts WHERE student_id = ?)', [req.params.id]);

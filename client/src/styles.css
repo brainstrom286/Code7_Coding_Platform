@@ -928,6 +928,73 @@ tr:hover td { background: rgba(99,102,241,0.05); }
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
+/* Confirm Modal */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.confirm-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+}
+
+.confirm-box h3 {
+  font-size: 1.15rem;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.confirm-box p {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.confirm-box .actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* Danger Zone */
+.danger-zone {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.danger-zone h4 {
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.danger-zone p {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.danger-actions {
+  display: flex;
+  gap: 10px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .sidebar { display: none; }

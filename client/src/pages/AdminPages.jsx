@@ -19,10 +19,22 @@ function Modal({ open, title, onClose, children, footer, maxWidth = 700 }) {
 
 function ConfirmModal({ open, title, message, confirmText, confirmClass, onCancel, onConfirm }) {
   if (!open) return null;
+  const isDanger = confirmClass?.includes('danger');
   return (
     <div className="confirm-overlay">
       <div className="confirm-box">
-        <h3>{title}</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <span style={{
+            fontSize: 22,
+            background: isDanger ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+            color: isDanger ? 'var(--danger)' : 'var(--warning)',
+            borderRadius: '50%',
+            width: 44, height: 44,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>⚠</span>
+          <h3 style={{ margin: 0 }}>{title}</h3>
+        </div>
         <p>{message}</p>
         <div className="actions">
           <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
@@ -57,6 +69,7 @@ export function AdminDashboardPage() {
   });
   const [testError, setTestError] = useState('');
   const [confirmAction, setConfirmAction] = useState(null);
+  const [resultSort, setResultSort] = useState({ key: 'enrollment', dir: 'asc' });
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -187,18 +200,11 @@ export function AdminDashboardPage() {
   }
 
   async function deleteTest(id) {
-    if (!window.confirm('Delete this test and all its data? This cannot be undone.')) return;
-    await apiFetch(`/admin/tests/${id}`, { method: 'DELETE' });
-    await loadTests();
-    await loadDashboard();
-    await loadResultsTestList();
+    setConfirmAction({ type: 'delete-test', id });
   }
 
   async function deleteStudent(id) {
-    if (!window.confirm('Delete this student and all their data?')) return;
-    await apiFetch(`/admin/students/${id}`, { method: 'DELETE' });
-    await loadStudents();
-    await loadDashboard();
+    setConfirmAction({ type: 'delete-student', id });
   }
 
   async function executeAction() {
@@ -206,15 +212,20 @@ export function AdminDashboardPage() {
     setConfirmAction(null);
     if (!action) return;
 
-    if (action === 'reset-attempts') {
+    if (action === 'reset-attempts' || action.type === 'reset-attempts') {
       await apiFetch('/admin/reset/attempts', { method: 'DELETE' });
-    } else if (action === 'reset-all') {
+    } else if (action === 'reset-all' || action.type === 'reset-all') {
       await apiFetch('/admin/reset/all', { method: 'DELETE' });
       await loadStudents();
-    } else if (action === 'delete-tests') {
-      for (const t of tests) {
-        await apiFetch(`/admin/tests/${t.id}`, { method: 'DELETE' });
-      }
+    } else if (action === 'delete-tests' || action.type === 'delete-tests') {
+      await apiFetch('/admin/reset/tests', { method: 'DELETE' });
+    } else if (action.type === 'delete-test') {
+      await apiFetch(`/admin/tests/${action.id}`, { method: 'DELETE' });
+    } else if (action.type === 'delete-student') {
+      await apiFetch(`/admin/students/${action.id}`, { method: 'DELETE' });
+      await loadStudents();
+      await loadDashboard();
+      return;
     }
     await loadDashboard();
     await loadTests();
@@ -402,17 +413,47 @@ export function AdminDashboardPage() {
                     <thead>
                       <tr>
                         <th>Name</th>
-                        <th>Enrollment</th>
+                        <th
+                          style={{ cursor: 'pointer', userSelect: 'none' }}
+                          onClick={() => setResultSort(s => ({ key: 'enrollment', dir: s.key === 'enrollment' && s.dir === 'asc' ? 'desc' : 'asc' }))}
+                        >
+                          Enrollment {resultSort.key === 'enrollment' ? (resultSort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                        </th>
                         <th>Email</th>
-                        <th>Score</th>
+                        <th
+                          style={{ cursor: 'pointer', userSelect: 'none' }}
+                          onClick={() => setResultSort(s => ({ key: 'score', dir: s.key === 'score' && s.dir === 'asc' ? 'desc' : 'asc' }))}
+                        >
+                          Score {resultSort.key === 'score' ? (resultSort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                        </th>
                         <th>Status</th>
                         <th>Tab Switches</th>
-                        <th>Submitted At</th>
+                        <th
+                          style={{ cursor: 'pointer', userSelect: 'none' }}
+                          onClick={() => setResultSort(s => ({ key: 'submitted_at', dir: s.key === 'submitted_at' && s.dir === 'asc' ? 'desc' : 'asc' }))}
+                        >
+                          Submitted At {resultSort.key === 'submitted_at' ? (resultSort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                        </th>
                         <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {resultData.map(a => (
+                      {[...resultData].sort((a, b) => {
+                        let va, vb;
+                        if (resultSort.key === 'enrollment') {
+                          va = (a.enrollment || '').toLowerCase();
+                          vb = (b.enrollment || '').toLowerCase();
+                        } else if (resultSort.key === 'score') {
+                          va = a.total_marks_obtained ?? 0;
+                          vb = b.total_marks_obtained ?? 0;
+                        } else {
+                          va = a.submitted_at || '';
+                          vb = b.submitted_at || '';
+                        }
+                        if (va < vb) return resultSort.dir === 'asc' ? -1 : 1;
+                        if (va > vb) return resultSort.dir === 'asc' ? 1 : -1;
+                        return 0;
+                      }).map(a => (
                         <tr key={a.id}>
                           <td>{a.name}</td>
                           <td>{a.enrollment || '-'}</td>
@@ -446,27 +487,35 @@ export function AdminDashboardPage() {
               </div>
             </div>
             <div className="card">
-              <div className="card-header"><h3>Danger Zone</h3></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="card-header" style={{ marginBottom: 20 }}>
+                <h3 style={{ color: 'var(--danger)' }}>⚠ Danger Zone</h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div className="danger-zone">
-                  <h4>Reset All Attempts</h4>
-                  <p>Deletes all test attempts and question submissions. Students and tests are kept.</p>
-                  <div className="danger-actions">
-                    <button className="btn btn-warning btn-sm" onClick={() => setConfirmAction('reset-attempts')}>Reset All Attempts</button>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                    <div>
+                      <h4>Reset All Attempts</h4>
+                      <p style={{ margin: 0 }}>Deletes all test attempts and submissions. Student accounts and tests are kept.</p>
+                    </div>
+                    <button className="btn btn-warning btn-sm" style={{ flexShrink: 0 }} onClick={() => setConfirmAction('reset-attempts')}>Reset Attempts</button>
                   </div>
                 </div>
                 <div className="danger-zone">
-                  <h4>Delete All Student Data</h4>
-                  <p>Removes all student accounts along with their attempts and submissions.</p>
-                  <div className="danger-actions">
-                    <button className="btn btn-danger btn-sm" onClick={() => setConfirmAction('reset-all')}>Delete All Students &amp; Data</button>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                    <div>
+                      <h4>Delete All Students</h4>
+                      <p style={{ margin: 0 }}>Removes all student accounts along with their attempts and submissions.</p>
+                    </div>
+                    <button className="btn btn-danger btn-sm" style={{ flexShrink: 0 }} onClick={() => setConfirmAction('reset-all')}>Delete All Students</button>
                   </div>
                 </div>
                 <div className="danger-zone">
-                  <h4>Delete All Tests</h4>
-                  <p>Removes all tests, questions, test cases, and attempt data permanently.</p>
-                  <div className="danger-actions">
-                    <button className="btn btn-danger btn-sm" onClick={() => setConfirmAction('delete-tests')}>Delete All Tests</button>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                    <div>
+                      <h4>Delete All Tests</h4>
+                      <p style={{ margin: 0 }}>Removes all tests, questions, test cases, and all attempt data permanently.</p>
+                    </div>
+                    <button className="btn btn-danger btn-sm" style={{ flexShrink: 0 }} onClick={() => setConfirmAction('delete-tests')}>Delete All Tests</button>
                   </div>
                 </div>
               </div>
@@ -551,23 +600,31 @@ export function AdminDashboardPage() {
       <ConfirmModal
         open={!!confirmAction}
         title={
-          confirmAction === 'reset-attempts' ? 'Reset All Attempts?' :
-            confirmAction === 'reset-all' ? 'Delete All Student Data?' :
+          confirmAction?.type === 'delete-test' ? 'Delete This Test?' :
+          confirmAction?.type === 'delete-student' ? 'Delete This Student?' :
+          (confirmAction === 'reset-attempts' || confirmAction?.type === 'reset-attempts') ? 'Reset All Attempts?' :
+            (confirmAction === 'reset-all' || confirmAction?.type === 'reset-all') ? 'Delete All Student Data?' :
               'Delete All Tests?'
         }
         message={
-          confirmAction === 'reset-attempts'
-            ? 'This will delete all test attempts and submissions. Student accounts and tests are kept.'
-            : confirmAction === 'reset-all'
-              ? 'This will permanently delete ALL student accounts, attempts, and submissions. Tests and admin account are kept.'
-              : 'This will permanently delete ALL tests, questions, test cases, and all attempt data.'
+          confirmAction?.type === 'delete-test'
+            ? 'This will permanently delete this test, all its questions, test cases, and attempt data. This cannot be undone.'
+            : confirmAction?.type === 'delete-student'
+              ? 'This will permanently delete this student and all their attempts and submissions.'
+              : (confirmAction === 'reset-attempts' || confirmAction?.type === 'reset-attempts')
+                ? 'This will delete all test attempts and submissions. Student accounts and tests are kept.'
+                : (confirmAction === 'reset-all' || confirmAction?.type === 'reset-all')
+                  ? 'This will permanently delete ALL student accounts, attempts, and submissions. Tests and admin account are kept.'
+                  : 'This will permanently delete ALL tests, questions, test cases, and all attempt data.'
         }
         confirmText={
-          confirmAction === 'reset-attempts' ? 'Yes, Reset Attempts' :
-            confirmAction === 'reset-all' ? 'Yes, Delete All Students' :
+          confirmAction?.type === 'delete-test' ? 'Yes, Delete Test' :
+          confirmAction?.type === 'delete-student' ? 'Yes, Delete Student' :
+          (confirmAction === 'reset-attempts' || confirmAction?.type === 'reset-attempts') ? 'Yes, Reset Attempts' :
+            (confirmAction === 'reset-all' || confirmAction?.type === 'reset-all') ? 'Yes, Delete All Students' :
               'Yes, Delete All Tests'
         }
-        confirmClass={confirmAction === 'reset-attempts' ? 'btn-warning' : 'btn-danger'}
+        confirmClass={(confirmAction === 'reset-attempts' || confirmAction?.type === 'reset-attempts') ? 'btn-warning' : 'btn-danger'}
         onCancel={() => setConfirmAction(null)}
         onConfirm={executeAction}
       />
