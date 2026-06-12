@@ -552,8 +552,8 @@ export function AdminDashboardPage() {
         open={!!confirmAction}
         title={
           confirmAction === 'reset-attempts' ? 'Reset All Attempts?' :
-          confirmAction === 'reset-all' ? 'Delete All Student Data?' :
-          'Delete All Tests?'
+            confirmAction === 'reset-all' ? 'Delete All Student Data?' :
+              'Delete All Tests?'
         }
         message={
           confirmAction === 'reset-attempts'
@@ -564,8 +564,8 @@ export function AdminDashboardPage() {
         }
         confirmText={
           confirmAction === 'reset-attempts' ? 'Yes, Reset Attempts' :
-          confirmAction === 'reset-all' ? 'Yes, Delete All Students' :
-          'Yes, Delete All Tests'
+            confirmAction === 'reset-all' ? 'Yes, Delete All Students' :
+              'Yes, Delete All Tests'
         }
         confirmClass={confirmAction === 'reset-attempts' ? 'btn-warning' : 'btn-danger'}
         onCancel={() => setConfirmAction(null)}
@@ -574,6 +574,22 @@ export function AdminDashboardPage() {
     </div>
   );
 }
+
+const SUPPORTED_BP_LANGUAGES = [
+  { key: 'python', label: 'Python' },
+  { key: 'javascript', label: 'JavaScript' },
+  { key: 'java', label: 'Java' },
+  { key: 'cpp', label: 'C++' },
+  { key: 'c', label: 'C' },
+];
+
+const DEFAULT_BOILERPLATE = {
+  python: `def solve():\n    # write your solution here\n    pass\n\nif __name__ == '__main__':\n    solve()`,
+  javascript: `function solve() {\n    // write your solution here\n}\n\nsolve();`,
+  java: `import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        // write your solution here\n    }\n}`,
+  cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(NULL);\n\n    // write your solution here\n    return 0;\n}`,
+  c: `#include <stdio.h>\n\nint main() {\n    // write your solution here\n    return 0;\n}`,
+};
 
 export function TestEditorPage() {
   const navigate = useNavigate();
@@ -711,15 +727,15 @@ export function TestEditorPage() {
   }
 
   function switchBpLang(lang) {
-    setBpData(prev => ({ ...prev, [currentBpLang]: document.getElementById('bpCode')?.value || prev[currentBpLang] || '' }));
     setCurrentBpLang(lang);
   }
 
+  function updateBpCode(value) {
+    setBpData(prev => ({ ...prev, [currentBpLang]: value }));
+  }
+
   function collectBoilerplate() {
-    const code = document.getElementById('bpCode')?.value || bpData[currentBpLang] || '';
-    const next = { ...bpData, [currentBpLang]: code };
-    setBpData(next);
-    return Object.entries(next)
+    return Object.entries(bpData)
       .filter(([, value]) => value.trim())
       .map(([language, value]) => ({ language, code: value }));
   }
@@ -731,7 +747,11 @@ export function TestEditorPage() {
     }
 
     const body = {
-      ...questionForm,
+      title: questionForm.title,
+      problem_statement: questionForm.problem_statement,
+      input_format: questionForm.input_format,
+      output_format: questionForm.output_format,
+      constraints: questionForm.constraints,
       marks: parseInt(questionForm.marks, 10) || 10,
       order_index: editingQId ? undefined : (testData?.questions?.length || 0),
       sample_cases: sampleCases.filter(tc => tc.input.trim() || tc.expected_output.trim()).map(tc => ({
@@ -744,6 +764,7 @@ export function TestEditorPage() {
         expected_output: tc.expected_output,
       })),
       boilerplate: collectBoilerplate(),
+      image_url: null,
     };
 
     try {
@@ -879,27 +900,50 @@ export function TestEditorPage() {
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <label style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 500 }}>Sample Test Cases</label>
-            <button type="button" className="add-tc-btn" onClick={() => setSampleCases(prev => [...prev, { input: '', expected_output: '', explanation: '' }])}>+ Add Sample Case</button>
+            <button type="button" className="add-tc-btn" style={{ color: 'var(--primary)' }} onClick={() => setSampleCases(prev => [...prev, { input: '', expected_output: '', explanation: '' }])}>+ Add Sample Case</button>
           </div>
           {sampleCases.map((tc, i) => (
             <div className="tc-group" key={`sample-${i}`}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
                 <span className="text-sm text-muted">Sample Case {i + 1}</span>
                 <button type="button" className="add-tc-btn" style={{ color: 'var(--danger)' }} onClick={() => setSampleCases(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev)}>Remove</button>
               </div>
               <div className="tc-row">
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text2)' }}>Input</label>
-                  <textarea rows="2" value={tc.input} onChange={e => updateSampleCase(i, 'input', e.target.value)} placeholder="Input..." />
+                  <textarea
+                    rows="5"
+                    value={tc.input}
+                    onChange={e => updateSampleCase(i, 'input', e.target.value)}
+                    placeholder="Input..."
+                    style={{
+                      width: '100%',
+                      resize: 'vertical',
+                      fontFamily: 'monospace',
+                      minHeight: '10px'
+                    }}
+                  />
                 </div>
+
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text2)' }}>Expected Output</label>
-                  <textarea rows="2" value={tc.expected_output} onChange={e => updateSampleCase(i, 'expected_output', e.target.value)} placeholder="Output..." />
+                  <textarea
+                    rows="5"
+                    value={tc.expected_output}
+                    onChange={e => updateSampleCase(i, 'expected_output', e.target.value)}
+                    placeholder="Output..."
+                    style={{
+                      width: '100%',
+                      resize: 'vertical',
+                      fontFamily: 'monospace',
+                      minHeight: '10px'
+                    }}
+                  />
                 </div>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--text2)' }}>Explanation (optional)</label>
-                <input type="text" value={tc.explanation} onChange={e => updateSampleCase(i, 'explanation', e.target.value)} placeholder="Brief explanation..." />
+                <label style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 500 }}>Explanation (optional)</label>
+                <textarea rows="2" value={tc.explanation} onChange={e => updateSampleCase(i, 'explanation', e.target.value)} placeholder="Brief explanation..." />
               </div>
             </div>
           ))}
@@ -908,22 +952,52 @@ export function TestEditorPage() {
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <label style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 500 }}>Hidden Test Cases (for evaluation)</label>
-            <button type="button" className="add-tc-btn" onClick={() => setHiddenCases(prev => [...prev, { input: '', expected_output: '' }])}>+ Add Hidden Case</button>
+            <button type="button" className="add-tc-btn" style={{ color: 'var(--primary)' }} onClick={() => setHiddenCases(prev => [...prev, { input: '', expected_output: '' }])}>+ Add Hidden Case</button>
           </div>
           {hiddenCases.map((tc, i) => (
             <div className="tc-group" key={`hidden-${i}`}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span className="text-sm text-muted">Hidden Case {i + 1}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                <div>
+                  <span className="text-sm text-muted">Hidden Case {i + 1}</span>
+                  {questionForm.marks ? (
+                    <span className="badge badge-info" style={{ marginLeft: 8, fontSize: 12 }}>
+                      {Math.round((questionForm.marks / hiddenCases.length) * 100) / 100} marks
+                    </span>
+                  ) : null}
+                </div>
                 <button type="button" className="add-tc-btn" style={{ color: 'var(--danger)' }} onClick={() => setHiddenCases(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev)}>Remove</button>
               </div>
               <div className="tc-row">
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text2)' }}>Input</label>
-                  <textarea rows="2" value={tc.input} onChange={e => updateHiddenCase(i, 'input', e.target.value)} placeholder="Input..." />
+                  <textarea
+                    rows="5"
+                    value={tc.input}
+                    onChange={e => updateHiddenCase(i, 'input', e.target.value)}
+                    placeholder="Input..."
+                    style={{
+                      width: '100%',
+                      resize: 'vertical',
+                      fontFamily: 'monospace',
+                      minHeight: '10px'
+                    }}
+                  />
                 </div>
+
                 <div>
                   <label style={{ fontSize: 12, color: 'var(--text2)' }}>Expected Output</label>
-                  <textarea rows="2" value={tc.expected_output} onChange={e => updateHiddenCase(i, 'expected_output', e.target.value)} placeholder="Output..." />
+                  <textarea
+                    rows="5"
+                    value={tc.expected_output}
+                    onChange={e => updateHiddenCase(i, 'expected_output', e.target.value)}
+                    placeholder="Output..."
+                    style={{
+                      width: '100%',
+                      resize: 'vertical',
+                      fontFamily: 'monospace',
+                      minHeight: '10px'
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -933,23 +1007,26 @@ export function TestEditorPage() {
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 500, display: 'block', marginBottom: 8 }}>Boilerplate Code</label>
           <div className="lang-tabs">
-            {['python', 'javascript', 'java', 'cpp', 'c'].map(lang => (
+            {SUPPORTED_BP_LANGUAGES.map(lang => (
               <div
-                key={lang}
-                className={`lang-tab ${currentBpLang === lang ? 'active' : ''}`}
-                onClick={() => switchBpLang(lang)}
+                key={lang.key}
+                className={`lang-tab ${currentBpLang === lang.key ? 'active' : ''}`}
+                onClick={() => switchBpLang(lang.key)}
               >
-                {lang}
+                {lang.label}
               </div>
             ))}
           </div>
           <textarea
-            id="bpCode"
-            rows="16"
-            placeholder="Boilerplate code for selected language..."
+            className="bp-editor"
+            rows="18"
+            placeholder={DEFAULT_BOILERPLATE[currentBpLang]}
             value={bpData[currentBpLang]}
-            onChange={e => setBpData(prev => ({ ...prev, [currentBpLang]: e.target.value }))}
+            onChange={e => updateBpCode(e.target.value)}
           />
+          <p className="text-sm text-muted" style={{ marginTop: 8 }}>
+            Fill boilerplate only for languages you want to support. Empty languages are ignored.
+          </p>
         </div>
 
         <p className={`error-msg ${qError ? '' : 'hidden'}`}>{qError}</p>

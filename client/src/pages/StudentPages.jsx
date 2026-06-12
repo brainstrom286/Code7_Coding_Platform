@@ -65,7 +65,7 @@ function TestCaseCard({ item, index, showInput = false }) {
 
 export function StudentDashboardPage() {
   const navigate = useNavigate();
-  const user = getUser();
+  const user = useRef(getUser()).current;
   const [section, setSection] = useState('tests');
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -243,6 +243,9 @@ export function StudentInstructionsPage() {
   }, [attemptId, countingDown, navigate, testData?.duration]);
 
   function startCountdown() {
+    if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
     setCountdown(5);
     setCountingDown(true);
   }
@@ -355,17 +358,27 @@ export function StudentTestPage() {
     async function loadTest() {
       try {
         const data = await apiFetch(`/student/attempts/${attemptId}/questions`);
+        console.log("durationMin =", durationMin);
+        console.log("startedAt =", data.startedAt);
+        console.log('Loaded test data:', data);
+        
+        if (!data || !data.questions) {
+          setWarning('Error: No questions data received from server');
+          setLoading(false);
+          return;
+        }
+        
         setQuestions(data.questions || []);
 
-        const totalSec = durationMin * 60;
-        if (data.startedAt) {
-          const elapsed = Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 1000);
-          setTimerSeconds(Math.max(totalSec - elapsed, 0));
-        } else {
-          setTimerSeconds(totalSec);
-        }
+        setTimerSeconds(durationMin * 60);
 
         const initialQuestions = data.questions || [];
+        if (!initialQuestions.length) {
+          setWarning('This test has no questions. Please contact your instructor.');
+          setLoading(false);
+          return;
+        }
+
         const savedMap = {};
         for (const q of initialQuestions) {
           if (q.saved) {
@@ -389,15 +402,15 @@ export function StudentTestPage() {
         }
 
         setLoading(false);
-        enterFullscreen();
       } catch (err) {
-        setWarning(err.message);
+        console.error('Error loading test:', err);
+        setWarning(err.message || 'Failed to load test');
         setLoading(false);
       }
     }
 
     loadTest();
-  }, [attemptId, durationMin, navigate, user]);
+  }, [attemptId]);
 
   useEffect(() => {
     if (!currentQuestion) return;
@@ -461,21 +474,28 @@ export function StudentTestPage() {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   }, [attemptId]);
 
+useEffect(() => {
+  if (loading || submittingTest) return;
+  
+  const timer = setInterval(() => {
+    setTimerSeconds(prev => {
+      if (prev <= 1) {
+        submitTestRef.current?.(true);
+        return 0;
+      }
+      return prev - 1;
+    });
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, [loading, submittingTest]);
+
+
   useEffect(() => {
-    if (loading || submittingTest) return undefined;
-    if (timerSeconds <= 0) return undefined;
-    const timer = setInterval(() => {
-      setTimerSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          submitTestRef.current?.(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [loading, submittingTest, timerSeconds]);
+    if (!warning) return undefined;
+    const timer = setTimeout(() => setWarning(''), 5000);
+    return () => clearTimeout(timer);
+  }, [warning]);
 
   useEffect(() => {
     if (runCooldown <= 0) return undefined;
@@ -599,11 +619,53 @@ export function StudentTestPage() {
   submitTestRef.current = submitTest;
 
   if (loading) {
-    return <div className="test-env"><div className="text-center text-muted" style={{ padding: 40 }}><span className="loader" /></div></div>;
+    return (
+      <div className="test-env">
+        <div className="test-header">
+          <div className="test-title">Starting test...</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="text-center text-muted">
+            <span className="loader"></span>
+            <p style={{ marginTop: 16 }}>Loading questions and test data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!questions.length) {
+    return (
+      <div className="test-env">
+        <div className="test-header">
+          <div className="test-title">Error</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <div className="alert alert-danger" style={{ marginBottom: 20, maxWidth: 500 }}>
+              {warning || 'No questions found for this test. This test may not have any questions added yet.'}
+            </div>
+            <Link to="/student/dashboard" className="btn btn-ghost">Back to Dashboard</Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (warning && !questions.length) {
-    return <div className="test-env"><div className="alert alert-danger" style={{ margin: 20 }}>{warning}</div></div>;
+    return (
+      <div className="test-env">
+        <div className="test-header">
+          <div className="test-title">Error Loading Test</div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <div className="alert alert-danger" style={{ marginBottom: 20 }}>{warning}</div>
+            <Link to="/student/dashboard" className="btn btn-ghost">Back to Dashboard</Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const marksPerCase = currentQuestion?.hidden_count > 0
@@ -616,11 +678,6 @@ export function StudentTestPage() {
   const summaryClass = allPass ? 'all-pass' : nonePass ? 'all-fail' : 'partial';
   const summaryIcon = allPass ? 'OK' : nonePass ? 'X' : '!';
 
-  useEffect(() => {
-    if (!warning) return undefined;
-    const timer = setTimeout(() => setWarning(''), 5000);
-    return () => clearTimeout(timer);
-  }, [warning]);
 
   return (
     <>
@@ -690,16 +747,27 @@ export function StudentTestPage() {
               {currentQuestion.sample_cases?.length ? (
                 <div className="problem-section">
                   <h4>Sample Test Cases</h4>
-                  {currentQuestion.sample_cases.map((tc, i) => (
-                    <div className="sample-case" key={i}>
-                      <div className="label" style={{ fontWeight: 600, marginBottom: 8 }}>Example {i + 1}</div>
-                      <div className="label">Input:</div>
-                      <pre style={{ margin: '4px 0 8px' }}>{tc.input}</pre>
-                      <div className="label">Expected Output:</div>
-                      <pre style={{ margin: `4px 0 ${tc.explanation ? '8px' : '0'}` }}>{tc.expected_output}</pre>
-                      {tc.explanation ? <div className="label" style={{ marginTop: 4, fontStyle: 'italic' }}>Tip: {tc.explanation}</div> : null}
-                    </div>
-                  ))}
+                  <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
+                    Total question marks: {currentQuestion.marks}. Each sample case shown here helps you validate your solution.
+                  </div>
+                  {currentQuestion.sample_cases.map((tc, i) => {
+                    const perCaseMark = currentQuestion.marks && currentQuestion.sample_cases.length
+                      ? (currentQuestion.marks / currentQuestion.sample_cases.length).toFixed(1)
+                      : '0';
+                    return (
+                      <div className="sample-case" key={i}>
+                        <div className="sample-header">
+                          <span>Example {i + 1}</span>
+                          <span className="badge badge-info">~{perCaseMark} marks</span>
+                        </div>
+                        <div className="label">Input:</div>
+                        <pre style={{ margin: '4px 0 8px' }}>{tc.input}</pre>
+                        <div className="label">Expected Output:</div>
+                        <pre style={{ margin: `4px 0 ${tc.explanation ? '8px' : '0'}` }}>{tc.expected_output}</pre>
+                        {tc.explanation ? <div className="label" style={{ marginTop: 4, fontStyle: 'italic' }}>Tip: {tc.explanation}</div> : null}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : null}
             </>
