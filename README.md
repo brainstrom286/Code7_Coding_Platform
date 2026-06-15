@@ -60,3 +60,8 @@ Seed the sample placement test after PostgreSQL is ready:
 cd backend
 node seed-demo.js
 ```
+
+## For Testing
+Admin Credential   
+Email: tnpcell@gmail.com   
+Password: svittnp@1234
